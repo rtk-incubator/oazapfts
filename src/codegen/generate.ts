@@ -373,9 +373,17 @@ export default class ApiGenerator {
     }
     if (schema.allOf) {
       // allOf -> intersection
-      return factory.createIntersectionTypeNode(
-        schema.allOf.map((schema) => this.getTypeFromSchema(schema)),
-      );
+      let result = schema.allOf.map((schema) => this.getTypeFromSchema(schema));
+      if (schema.properties || schema.additionalProperties) {
+        result.push(
+          this.getTypeFromProperties(
+            schema.properties || {},
+            schema.required,
+            schema.additionalProperties,
+          ),
+        );
+      }
+      return factory.createIntersectionTypeNode(result);
     }
     if ('items' in schema) {
       // items -> array

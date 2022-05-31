@@ -1,7 +1,7 @@
 {
-  "name": "oazapfts",
-  "version": "3.6.0",
-  "description": "OpenApi TypeScript client generator",
+  "name": "@rtk-query/oazapfts-patched",
+  "version": "3.6.0-1",
+  "description": "Forked and patched version of oazapfts, an OpenApi TypeScript client generator",
   "main": "lib/index.js",
   "bin": {
     "oazapfts": "lib/codegen/cli.js"
@@ -21,7 +21,7 @@
   ],
   "author": "Felix Gnass",
   "license": "MIT",
-  "repository": "cellular/oazapfts",
+  "repository": "rtk-incubator/oazapfts",
   "devDependencies": {
     "@jest/types": "^27.0.2",
     "@types/jest": "^27.0.1",
