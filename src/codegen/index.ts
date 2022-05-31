@@ -11,6 +11,8 @@ export type Opts = {
   include?: string[];
   exclude?: string[];
   optimistic?: boolean;
+  // Useful for when `exactOptionalPropertyTypes: true` in `tsconfig`. Produces `prop?: string | undefined` instead of `prop?: string`
+  unionUndefined?: boolean;
 };
 
 export function generateAst(
