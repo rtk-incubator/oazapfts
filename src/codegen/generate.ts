@@ -24,18 +24,30 @@ export const contentTypes: Record<string, ContentType> = {
   '*/*': 'json',
   'application/json': 'json',
   'application/hal+json': 'json',
+  'application/merge-patch+json': 'json',
+  'application/problem+json': 'json',
+  'application/geo+json': 'json',
   'application/x-www-form-urlencoded': 'form',
   'multipart/form-data': 'multipart',
+};
+
+// augment SchemaObject type to allow slowly adopting new OAS3.1+ features
+type SchemaObject = OpenAPIV3.SchemaObject & {
+  const?: unknown;
 };
 
 /**
  * Get the name of a formatter function for a given parameter.
  */
-export function getFormatter({ style, explode }: OpenAPIV3.ParameterObject) {
+export function getFormatter({
+  style = 'form',
+  explode = true,
+}: OpenAPIV3.ParameterObject) {
+  if (explode && style === 'deepObject') return 'deep';
+  if (explode) return 'explode';
   if (style === 'spaceDelimited') return 'space';
   if (style === 'pipeDelimited') return 'pipe';
-  if (style === 'deepObject') return 'deep';
-  return explode ? 'explode' : 'form';
+  return 'form';
 }
 
 export function getOperationIdentifier(id?: string) {
@@ -102,10 +114,17 @@ export function createUrlExpression(path: string, qs?: ts.Expression) {
     /(.*?)\{(.+?)\}(.*?)(?=\{|$)/g,
     (_substr, head, name, literal) => {
       const expression = _.camelCase(name);
-      spans.push({ expression: factory.createIdentifier(expression), literal });
+      spans.push({
+        expression: cg.createCall(
+          factory.createIdentifier('encodeURIComponent'),
+          { args: [factory.createIdentifier(expression)] },
+        ),
+        literal,
+      });
       return head;
     },
   );
+
   if (qs) {
     // add the query string as last span
     spans.push({ expression: qs, literal: '' });
@@ -189,6 +208,9 @@ export default class ApiGenerator {
 
   aliases: ts.TypeAliasDeclaration[] = [];
 
+  enumAliases: ts.Statement[] = [];
+  enumRefs: Record<string, { values: string; type: ts.TypeReferenceNode }> = {};
+
   // Collect the types of all referenced schemas so we can export them later
   refs: Record<string, ts.TypeReferenceNode> = {};
 
@@ -197,6 +219,7 @@ export default class ApiGenerator {
 
   reset() {
     this.aliases = [];
+    this.enumAliases = [];
     this.refs = {};
     this.typeAliases = {};
   }
@@ -238,6 +261,15 @@ export default class ApiGenerator {
     return name;
   }
 
+  getEnumUniqueAlias(name: string, values: string) {
+    // If enum name already exists and have the same values
+    if (this.enumRefs[name] && this.enumRefs[name].values == values) {
+      return name;
+    }
+
+    return this.getUniqueAlias(name);
+  }
+
   getRefBasename(ref: string): string {
     return ref.replace(/.+\//, '');
   }
@@ -249,7 +281,7 @@ export default class ApiGenerator {
     const { $ref } = obj;
     let ref = this.refs[$ref];
     if (!ref) {
-      const schema = this.resolve<OpenAPIV3.SchemaObject>(obj);
+      const schema = this.resolve<SchemaObject>(obj);
       const name = this.getUniqueAlias(
         _.upperFirst(_.camelCase(schema.title || this.getRefBasename($ref))),
       );
@@ -269,7 +301,7 @@ export default class ApiGenerator {
   }
 
   getUnionType(
-    variants: (OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject)[],
+    variants: (OpenAPIV3.ReferenceObject | SchemaObject)[],
     discriminator?: OpenAPIV3.DiscriminatorObject,
   ): ts.TypeNode {
     if (discriminator) {
@@ -341,9 +373,10 @@ export default class ApiGenerator {
    * optionally adds a union with null.
    */
   getTypeFromSchema(
-    schema?: OpenAPIV3.SchemaObject | OpenAPIV3.ReferenceObject,
+    schema?: SchemaObject | OpenAPIV3.ReferenceObject,
+    name?: string,
   ): ts.TypeNode {
-    const type = this.getBaseTypeFromSchema(schema);
+    const type = this.getBaseTypeFromSchema(schema, name);
     return isNullable(schema)
       ? factory.createUnionTypeNode([type, cg.keywordType.null])
       : type;
@@ -354,7 +387,8 @@ export default class ApiGenerator {
    * schema and returns the appropriate type.
    */
   getBaseTypeFromSchema(
-    schema?: OpenAPIV3.SchemaObject | OpenAPIV3.ReferenceObject,
+    schema?: SchemaObject | OpenAPIV3.ReferenceObject,
+    name?: string,
   ): ts.TypeNode {
     if (!schema) return cg.keywordType.any;
     if (isReference(schema)) {
@@ -373,9 +407,13 @@ export default class ApiGenerator {
     }
     if (schema.allOf) {
       // allOf -> intersection
-      let result = schema.allOf.map((schema) => this.getTypeFromSchema(schema));
+      const types = schema.allOf.map((schema) =>
+        this.getTypeFromSchema(schema),
+      );
+
       if (schema.properties || schema.additionalProperties) {
-        result.push(
+        // properties -> literal type
+        types.push(
           this.getTypeFromProperties(
             schema.properties || {},
             schema.required,
@@ -383,7 +421,7 @@ export default class ApiGenerator {
           ),
         );
       }
-      return factory.createIntersectionTypeNode(result);
+      return factory.createIntersectionTypeNode(types);
     }
     if ('items' in schema) {
       // items -> array
@@ -398,25 +436,15 @@ export default class ApiGenerator {
       );
     }
     if (schema.enum) {
-      // enum -> union of literal types
-      const types = schema.enum.map((s) => {
-        if (s === null) return cg.keywordType.null;
-        if (typeof s === 'boolean')
-          return s
-            ? factory.createLiteralTypeNode(
-                ts.factory.createToken(ts.SyntaxKind.TrueKeyword),
-              )
-            : factory.createLiteralTypeNode(
-                ts.factory.createToken(ts.SyntaxKind.FalseKeyword),
-              );
-        if (typeof s === 'number')
-          return factory.createLiteralTypeNode(factory.createNumericLiteral(s));
-        return factory.createLiteralTypeNode(factory.createStringLiteral(s));
-      });
-      return types.length > 1 ? factory.createUnionTypeNode(types) : types[0];
+      return this.opts.useEnumType && name && schema.type != 'boolean'
+        ? this.getTrueEnum(schema, name)
+        : this.getTypeFromEnum(schema.enum);
     }
     if (schema.format == 'binary') {
       return factory.createTypeReferenceNode('Blob', []);
+    }
+    if (schema.const) {
+      return this.getTypeFromEnum([schema.const]);
     }
     if (schema.type) {
       // string, boolean, null, number
@@ -428,22 +456,91 @@ export default class ApiGenerator {
   }
 
   /**
+   * Creates literal type (or union) from an array of values
+   */
+  getTypeFromEnum(values: unknown[]) {
+    const types = values.map((s) => {
+      if (s === null) return cg.keywordType.null;
+      if (typeof s === 'boolean')
+        return s
+          ? factory.createLiteralTypeNode(
+              ts.factory.createToken(ts.SyntaxKind.TrueKeyword),
+            )
+          : factory.createLiteralTypeNode(
+              ts.factory.createToken(ts.SyntaxKind.FalseKeyword),
+            );
+      if (typeof s === 'number')
+        return factory.createLiteralTypeNode(factory.createNumericLiteral(s));
+      if (typeof s === 'string')
+        return factory.createLiteralTypeNode(factory.createStringLiteral(s));
+      throw new Error(`Unexpected ${String(s)} of type ${typeof s} in enum`);
+    });
+    return types.length > 1 ? factory.createUnionTypeNode(types) : types[0];
+  }
+
+  getEnumValuesString(values: string[]): string {
+    return values.join('_');
+  }
+
+  /*
+    Creates a enum "ref" if not used, reuse existing if values and name matches or creates a new one
+    with a new name adding a number
+  */
+  getTrueEnum(schema: OpenAPIV3.NonArraySchemaObject, propName: string) {
+    const proposedName = schema.title || _.upperFirst(propName);
+    const stringEnumValue = this.getEnumValuesString(
+      schema.enum ? schema.enum : [],
+    );
+
+    const name = this.getEnumUniqueAlias(proposedName, stringEnumValue);
+
+    if (this.enumRefs[proposedName] && proposedName === name) {
+      return this.enumRefs[proposedName].type;
+    }
+
+    const values = schema.enum ? schema.enum : [];
+
+    const members = values.map((s, index) => {
+      if (schema.type === 'boolean') {
+        s = Boolean(s) ? 'true' : 'false';
+      } else if (schema.type === 'string') {
+        s = _.upperFirst(s);
+      }
+      return factory.createEnumMember(
+        factory.createIdentifier(s),
+        schema.type === 'number'
+          ? factory.createNumericLiteral(index)
+          : factory.createStringLiteral(s),
+      );
+    });
+    this.enumAliases.push(
+      factory.createEnumDeclaration([cg.modifier.export], name, members),
+    );
+
+    const type = factory.createTypeReferenceNode(name, undefined);
+
+    this.enumRefs[proposedName] = {
+      values: stringEnumValue,
+      type: factory.createTypeReferenceNode(name, undefined),
+    };
+
+    return type;
+  }
+
+  /**
    * Recursively creates a type literal with the given props.
    */
   getTypeFromProperties(
     props: {
-      [prop: string]: OpenAPIV3.SchemaObject | OpenAPIV3.ReferenceObject;
+      [prop: string]: SchemaObject | OpenAPIV3.ReferenceObject;
     },
     required?: string[],
-    additionalProperties?:
-      | boolean
-      | OpenAPIV3.SchemaObject
-      | OpenAPIV3.ReferenceObject,
+    additionalProperties?: boolean | SchemaObject | OpenAPIV3.ReferenceObject,
   ) {
     const members: ts.TypeElement[] = Object.keys(props).map((name) => {
       const schema = props[name];
       const isRequired = required && required.includes(name);
-      let type = this.getTypeFromSchema(schema);
+      let type = this.getTypeFromSchema(schema, name);
       if (!isRequired && this.opts.unionUndefined) {
         type = factory.createUnionTypeNode([type, cg.keywordType.undefined]);
       }
@@ -851,6 +948,7 @@ export default class ApiGenerator {
       statements: cg.appendNodes(
         stub.statements,
         ...[...this.aliases, ...functions],
+        ...this.enumAliases,
       ),
     });
 

@@ -1,5 +1,7 @@
 # 🍻 oazapfts!
 
+[![CI](https://github.com/cellular/oazapfts/actions/workflows/ci.yml/badge.svg)](https://github.com/cellular/oazapfts/actions/workflows/ci.yml)
+
 Generate TypeScript clients to tap into OpenAPI servers.
 
 ## Features
@@ -26,22 +28,26 @@ oazapfts <spec> [filename]
 Options:
 --exclude, -e tag to exclude
 --include, -i tag to include
+--optimistic
+--useEnumType
 ```
 
 Where `<spec>` is the URL or local path of an OpenAPI or Swagger spec (in either json or yml) and `<filename>` is the location of the `.ts` file to be generated. If the filename is omitted, the code is written to stdout.
+
+Use the `useEnumType` option to generate typescript enums instead of union of values.
 
 ## Overriding the defaults
 
 The generated file exports a `defaults` constant that can be used to override the `basePath`, provide a custom `fetch` implementation or to send additional headers with each request:
 
 ```ts
-import * as api from "./api.ts";
-import nodeFetch from "node-fetch";
+import * as api from './api.ts';
+import nodeFetch from 'node-fetch';
 
-api.default.basePath = "https://example.com/api";
+api.default.basePath = 'https://example.com/api';
 
 api.defaults.headers = {
-  access_token: "secret",
+  access_token: 'secret',
 };
 
 api.defaults.fetch = nodeFetch;
@@ -97,7 +103,7 @@ if (res.status === 404) {
 The above code can be simplified by using the `handle` helper:
 
 ```ts
-import { handle } from "oazapfts";
+import { handle } from 'oazapfts';
 
 await handle(api.getPetById(1), {
   200(pet) {
@@ -127,7 +133,7 @@ await handle(api.getPetById(1), {
 Instead of handling errors right in place we can also use the `ok` helper:
 
 ```ts
-import { ok } from "oazapfts";
+import { ok } from 'oazapfts';
 
 const pet = await ok(api.getPetById(1));
 ```
@@ -137,8 +143,8 @@ With this pattern `pet` will be typed as `Pet` and a `HttpError` will be thrown 
 You can even turn your whole API into an optimistic one:
 
 ```ts
-import { optimistic } from "oazapfts";
-import * as rawApi from "./api.ts";
+import { optimistic } from 'oazapfts';
+import * as rawApi from './api.ts';
 
 const api = optimistic(rawApi);
 const pet = await api.getPetById(1);
@@ -150,7 +156,7 @@ Since version 3.1.0 you can also use the `--optimistic` flag on the command line
 
 ## About the name
 
-The name comes from a combination of syllables **oa** (OpenAPI) and **ts** (TypeScript) and is [pronounced 🗣](https://youtu.be/chvb-K95rBE) like the Bavarian _O'zapt'is!_ (it's tapped), the famous words that mark the beginning of the Oktoberfest.
+The name comes from a combination of syllables **oa** (OpenAPI) and **ts** (TypeScript) and is [pronounced 🗣](https://www.youtube.com/watch?v=chvb-K95rBE) like the Bavarian _O'zapt'is!_ (it's tapped), the famous words that mark the beginning of the Oktoberfest.
 
 # License
 
