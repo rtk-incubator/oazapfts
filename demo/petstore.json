@@ -60,11 +60,6 @@
               "schema": {
                 "$ref": "#/components/schemas/Pet"
               }
-            },
-            "application/xml": {
-              "schema": {
-                "$ref": "#/components/schemas/Pet"
-              }
             }
           },
           "required": true
@@ -111,11 +106,6 @@
           "description": "Pet object that needs to be added to the store",
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Pet"
-              }
-            },
-            "application/xml": {
               "schema": {
                 "$ref": "#/components/schemas/Pet"
               }
@@ -223,14 +213,6 @@
           "200": {
             "description": "successful operation",
             "content": {
-              "application/xml": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Pet"
-                  }
-                }
-              },
               "application/json": {
                 "schema": {
                   "type": "array",
@@ -275,11 +257,6 @@
           "200": {
             "description": "successful operation",
             "content": {
-              "application/xml": {
-                "schema": {
-                  "$ref": "#/components/schemas/Pet"
-                }
-              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Pet"
@@ -488,11 +465,6 @@
           "200": {
             "description": "successful operation",
             "content": {
-              "application/xml": {
-                "schema": {
-                  "$ref": "#/components/schemas/Order"
-                }
-              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Order"
@@ -530,11 +502,6 @@
           "200": {
             "description": "successful operation",
             "content": {
-              "application/xml": {
-                "schema": {
-                  "$ref": "#/components/schemas/Order"
-                }
-              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Order"
@@ -705,11 +672,6 @@
               }
             },
             "content": {
-              "application/xml": {
-                "schema": {
-                  "type": "string"
-                }
-              },
               "application/json": {
                 "schema": {
                   "type": "string"
@@ -757,11 +719,6 @@
           "200": {
             "description": "successful operation",
             "content": {
-              "application/xml": {
-                "schema": {
-                  "$ref": "#/components/schemas/User"
-                }
-              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/User"
@@ -918,6 +875,189 @@
           }
         }
       }
+    },
+    "/object-parameters": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "defaultArray",
+            "schema": {
+              "$ref": "#/components/schemas/Option"
+            }
+          },
+          {
+            "in": "query",
+            "name": "explodedFormArray",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "$ref": "#/components/schemas/Option"
+            }
+          },
+          {
+            "in": "query",
+            "name": "commaArray",
+            "explode": false,
+            "schema": {
+              "$ref": "#/components/schemas/Option"
+            }
+          },
+          {
+            "in": "query",
+            "name": "defaultSpaceDelimited",
+            "style": "spaceDelimited",
+            "schema": {
+              "$ref": "#/components/schemas/Option"
+            }
+          },
+          {
+            "in": "query",
+            "name": "explodedSpaceDelimited",
+            "style": "spaceDelimited",
+            "explode": true,
+            "schema": {
+              "$ref": "#/components/schemas/Option"
+            }
+          },
+          {
+            "in": "query",
+            "name": "spaceDelimited",
+            "style": "spaceDelimited",
+            "explode": false,
+            "schema": {
+              "$ref": "#/components/schemas/Option"
+            }
+          },
+          {
+            "in": "query",
+            "name": "defaultPipeDelimited",
+            "style": "pipeDelimited",
+            "schema": {
+              "$ref": "#/components/schemas/Option"
+            }
+          },
+          {
+            "in": "query",
+            "name": "explodedPipeDelimited",
+            "style": "pipeDelimited",
+            "explode": true,
+            "schema": {
+              "$ref": "#/components/schemas/Option"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pipeDelimited",
+            "style": "pipeDelimited",
+            "explode": false,
+            "schema": {
+              "$ref": "#/components/schemas/Option"
+            }
+          },
+          {
+            "in": "query",
+            "name": "defaultObject",
+            "schema": {
+              "$ref": "#/components/schemas/Tag"
+            }
+          },
+          {
+            "in": "query",
+            "name": "explodedFormObject",
+            "explode": true,
+            "schema": {
+              "$ref": "#/components/schemas/Tag"
+            }
+          },
+          {
+            "in": "query",
+            "name": "commaObject",
+            "explode": false,
+            "schema": {
+              "$ref": "#/components/schemas/Tag"
+            }
+          },
+          {
+            "in": "query",
+            "name": "deepObject",
+            "style": "deepObject",
+            "schema": {
+              "$ref": "#/components/schemas/Tag"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/uploadPng": {
+      "post": {
+        "summary": "uploads an image in png format",
+        "operationId": "uploadPng",
+        "parameters": [],
+        "requestBody": {
+          "description": "The file content.",
+          "content": {
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                },
+                "example": {
+                  "code": 200,
+                  "type": "OK",
+                  "message": "OK"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "petstore_auth": ["write:pets", "read:pets"]
+          }
+        ]
+      }
+    },
+    "issue330": {
+      "put": {
+        "operationId": "issue330",
+        "parameters": [],
+        "requestBody": {
+          "description": "a string body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -981,6 +1121,11 @@
             "type": "integer",
             "description": "User Status",
             "format": "int32"
+          },
+          "category": {
+            "type": "string",
+            "description": "user category in the store",
+            "enum": ["rich", "wealthy", "poor"]
           }
         },
         "xml": {
@@ -1058,6 +1203,11 @@
             "description": "Always true for a pet",
             "enum": [true],
             "type": "boolean"
+          },
+          "size": {
+            "description": "Size scale for pets",
+            "enum": ["P", "M", "G"],
+            "type": "number"
           }
         },
         "xml": {
@@ -1077,6 +1227,14 @@
           "message": {
             "type": "string"
           }
+        }
+      },
+      "Option": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "default": ["one"],
+          "enum": ["one", "two", "three"]
         }
       }
     },
@@ -1103,14 +1261,6 @@
       "PetResponse": {
         "description": "successful operation",
         "content": {
-          "application/xml": {
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/components/schemas/Pet"
-              }
-            }
-          },
           "application/json": {
             "schema": {
               "type": "array",
