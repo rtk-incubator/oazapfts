@@ -212,6 +212,19 @@ export default class ApiGenerator {
     return getReference(this.spec, ref) as T;
   }
 
+  getSchemaProperties(schema: OpenAPIV3.SchemaObject) {
+    if (schema?.allOf && !isReference(schema?.allOf[0])) {
+      return schema.allOf[0].properties;
+    }
+    if (schema?.oneOf && !isReference(schema?.oneOf[0])) {
+      return schema.oneOf[0].properties;
+    }
+    if (schema?.anyOf && !isReference(schema?.anyOf[0])) {
+      return schema.anyOf[0].properties;
+    }
+    return schema.properties;
+  }
+
   resolveArray<T>(array?: Array<T | OpenAPIV3.ReferenceObject>) {
     return array ? array.map((el) => this.resolve(el)) : [];
   }
@@ -307,10 +320,20 @@ export default class ApiGenerator {
                 }
                 return !mappedValues.has(this.getRefBasename(variant.$ref));
               })
-              .map((schema) => [
-                this.getRefBasename((schema as OpenAPIV3.ReferenceObject).$ref),
-                schema,
-              ]),
+              .map((schema) => {
+                const schemaBaseName = this.getRefBasename(
+                  (schema as OpenAPIV3.ReferenceObject).$ref,
+                );
+                const resolvedSchema = this.resolve(schema);
+                const properties = this.getSchemaProperties(resolvedSchema);
+                const discriminatorProperty =
+                  properties?.[discriminator.propertyName];
+                const variantName =
+                  discriminatorProperty && 'enum' in discriminatorProperty
+                    ? discriminatorProperty?.enum?.[0]
+                    : '';
+                return [variantName || schemaBaseName, schema];
+              }),
           ] as [string, OpenAPIV3.ReferenceObject][]
         ).map(([discriminatorValue, variant]) =>
           // Yields: { [discriminator.propertyName]: discriminatorValue } & variant
